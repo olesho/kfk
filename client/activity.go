@@ -2,7 +2,7 @@ package main
 
 import (
 	"time"
-	"github.com/olesho/hl/structs"
+	"github.com/olesho/kfk/structs"
 	"math"
 	"math/rand"
 	"encoding/json"

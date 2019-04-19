@@ -2,7 +2,7 @@ package main
 
 import (
 	"net/http"
-	"github.com/olesho/hl/structs"
+	"github.com/olesho/kfk/structs"
 	"encoding/json"
 	"os"
 	"io"
