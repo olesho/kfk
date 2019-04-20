@@ -144,7 +144,7 @@ var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 1 MSG
-		messages <- kafka.Message{
+		visitMessages <- kafka.Message{
 			Value: v.Bytes(),
 			//Time:  time.Now(),
 		}
@@ -179,7 +179,7 @@ var ActivityHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 1 MSG
-		messages <- kafka.Message{
+		activityMessages <- kafka.Message{
 			Value: v.Bytes(),
 			//Time:  time.Now(),
 		}
@@ -194,7 +194,8 @@ var ShutdownHandler = func(w http.ResponseWriter, r *http.Request) {
 	os.Exit(0)
 }
 
-var messages = make(chan kafka.Message, 500)
+var visitMessages = make(chan kafka.Message, 500)
+var activityMessages = make(chan kafka.Message, 500)
 
 func serve() {
 	visitWriter, err := ConfigureBatchWriter([]string{kafkaAddr}, "1", "visit")
@@ -211,8 +212,8 @@ func serve() {
 	}
 	defer activityWriter.Close()
 
-	runStream(visitWriter)
-	runStream(activityWriter)
+	runStream(visitWriter, visitMessages)
+	runStream(activityWriter, activityMessages)
 
 
 	http.HandleFunc("/api/topic/load/v1/", LoadHandler) // test
@@ -236,13 +237,13 @@ func send(writer *kafka.Writer, slice []kafka.Message, timer *time.Timer) {
 }
 
 
-func runStream(writer *kafka.Writer) *kafka.Writer  {
+func runStream(writer *kafka.Writer, inputStream chan kafka.Message) *kafka.Writer  {
 	slice := []kafka.Message{}
 	timer := time.NewTimer(time.Second)
 
 	go func () {
 		for {
-			slice = append(slice, <- messages)
+			slice = append(slice, <- inputStream)
 			if len(slice) == 500 {
 				send(writer, slice, timer)
 			}
