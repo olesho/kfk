@@ -135,7 +135,7 @@ var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scanner := bufio.NewScanner(reader)
-
+	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		v := &structs.VisitPayload{}
 		err := json.Unmarshal(scanner.Bytes(), v)
@@ -144,10 +144,9 @@ var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 1 MSG
-		visitMessages <- kafka.Message{
+		visitGateway.Push(&kafka.Message{
 			Value: v.Bytes(),
-			//Time:  time.Now(),
-		}
+		})
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -170,7 +169,7 @@ var ActivityHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scanner := bufio.NewScanner(reader)
-
+	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		v := &structs.ActivityPayload{}
 		err := json.Unmarshal(scanner.Bytes(), v)
@@ -179,10 +178,9 @@ var ActivityHandler = func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 1 MSG
-		activityMessages <- kafka.Message{
+		activityGateway.Push(&kafka.Message{
 			Value: v.Bytes(),
-			//Time:  time.Now(),
-		}
+		})
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -194,27 +192,17 @@ var ShutdownHandler = func(w http.ResponseWriter, r *http.Request) {
 	os.Exit(0)
 }
 
-var visitMessages = make(chan kafka.Message, 500)
-var activityMessages = make(chan kafka.Message, 500)
+
+var visitGateway, activityGateway *Gateway
 
 func serve() {
-	visitWriter, err := ConfigureBatchWriter([]string{kafkaAddr}, "1", "visit")
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer visitWriter.Close()
+	visitGateway = NewGateway(kafkaAddr, "visit", "1")
+	defer visitGateway.Close()
+	visitGateway.RunStream()
 
-	activityWriter, err := ConfigureBatchWriter([]string{kafkaAddr}, "1", "activity")
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer activityWriter.Close()
-
-	runStream(visitWriter, visitMessages)
-	runStream(activityWriter, activityMessages)
-
+	activityGateway = NewGateway(kafkaAddr, "activity", "2")
+	defer activityGateway.Close()
+	activityGateway.RunStream()
 
 	http.HandleFunc("/api/topic/load/v1/", LoadHandler) // test
 	http.HandleFunc("/api/topic/delete/v1/", DeleteTopicHandler) // delete topics
@@ -227,34 +215,4 @@ func serve() {
 	http.ListenAndServe(":8000", nil)
 }
 
-func send(writer *kafka.Writer, slice []kafka.Message, timer *time.Timer) {
-	err := writer.WriteMessages(context.Background(), slice...)
-	if err != nil {
-		log.Println(err)
-	}
-	slice = []kafka.Message{}
-	timer.Reset(time.Second)
-}
 
-
-func runStream(writer *kafka.Writer, inputStream chan kafka.Message) *kafka.Writer  {
-	slice := []kafka.Message{}
-	timer := time.NewTimer(time.Second)
-
-	go func () {
-		for {
-			slice = append(slice, <- inputStream)
-			if len(slice) == 500 {
-				send(writer, slice, timer)
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			<- timer.C
-			send(writer, slice, timer)
-		}
-	}()
-	return writer
-}

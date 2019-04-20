@@ -13,7 +13,7 @@ var serverAddr = os.Getenv("SERVER_ADDR")
 
 func main() {
 	clientsNum := flag.Int("c", 1, "Number of clients")
-	requestsNum := flag.Int64("r", 1000, "Number of requests")
+	requestsNum := flag.Int("r", 1000, "Number of requests")
 	flag.Parse()
 
 	startTime := time.Now()
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	fmt.Println("Done in:", time.Now().Sub(startTime).Seconds(), "seconds")
-	fmt.Printf("Sent %v requests total\n", int64(*clientsNum)*(*requestsNum)*2)
+	fmt.Printf("Sent %v requests total\n", int(*clientsNum)*(*requestsNum)*2)
 }
 
 

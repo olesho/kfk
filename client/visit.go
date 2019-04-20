@@ -5,7 +5,6 @@ import (
 	"github.com/olesho/kfk/structs"
 	"math/rand"
 	"encoding/json"
-	"sync/atomic"
 	"net/http"
 	"bytes"
 	"log"
@@ -18,6 +17,8 @@ type VisitGenerator struct {
 	endpoint 			string
 	done				chan struct{}
 	logger 				*log.Logger
+
+	_cnt int64
 }
 
 func NewVisitGenerator(clientId int64, endpoint string, doneSignal chan struct{}, logger *log.Logger) *VisitGenerator {
@@ -40,8 +41,9 @@ func (vg *VisitGenerator) Next() *structs.VisitPayload {
 		AlgorithmType: 	rand.Intn(6)+1,
 		PoiId:         	rand.Int63(),
 		Latitude:		0,
-		Longitude:		0,
+		Longitude:		vg._cnt,
 	}
+	vg._cnt++
 	vg.currentStartTime = vg.currentStartTime.Add(time.Hour*2)
 	return p
 }
@@ -50,34 +52,29 @@ func (vg *VisitGenerator) CurrentDay() int {
 	return vg.currentStartTime.Day()
 }
 
-func (vg * VisitGenerator) Run(amount int64) {
+func (vg * VisitGenerator) Run(amount int) {
 	var payload []byte
-	var num = new(int64)
-	*num = amount
 
-	for {
-		if *num == 0 {
-			vg.send(payload)
-			break
-		}
-
+	for i := 0; i < amount; i++ {
 		oldDay := vg.CurrentDay()
 		data, _ := json.Marshal(vg.Next())
 		data = append(data, []byte("\n")...)
 		payload = append(payload, data...)
-		atomic.AddInt64(num, -1)
 
 		if oldDay != vg.CurrentDay() {
 			vg.send(payload)
 			payload = []byte{}
 		}
 	}
+	vg.send(payload)
 
 	vg.done <- struct{}{}
 }
 
 func (vg * VisitGenerator) send(payload []byte) {
 	if len(payload) > 0 {
+		//req, err := http.NewRequest("POST", vg.endpoint, bytes.NewBuffer(payload))
+
 		var buf bytes.Buffer
 		g := gzip.NewWriter(&buf)
 		if _, err := g.Write(payload); err != nil {

@@ -6,11 +6,10 @@ import (
 	"math"
 	"math/rand"
 	"encoding/json"
-	"sync/atomic"
 	"net/http"
 	"bytes"
-	"compress/gzip"
 	"log"
+	"compress/gzip"
 )
 
 type ActivityGenerator struct {
@@ -52,61 +51,49 @@ func (ag *ActivityGenerator) CurrentDay() int {
 	return ag.currentStartTime.Day()
 }
 
-func (ag *ActivityGenerator) Run(amount int64) {
+func (ag *ActivityGenerator) Run(amount int) {
 	var payload []byte
-	var num = new(int64)
-	*num = amount
 
-	for {
-		if *num == 0 {
-			break
-		}
-
+	for i := 0; i < amount; i++ {
 		oldDay := ag.CurrentDay()
 		data, _ := json.Marshal(ag.Next())
 		data = append(data, []byte("\n")...)
 		payload = append(payload, data...)
-		atomic.AddInt64(num, -1)
 
 		if oldDay != ag.CurrentDay() {
-			var buf bytes.Buffer
-			g := gzip.NewWriter(&buf)
-			if _, err := g.Write(data); err != nil {
-				ag.logger.Println(err)
-				return
-			}
-			if err := g.Close(); err != nil {
-				ag.logger.Println(err)
-				return
-			}
-
-			req, err := http.NewRequest("POST", ag.endpoint, &buf)
-			if err != nil {
-				ag.logger.Println(err)
-				return
-			}
-			req.Header.Add("Content-Encoding", "gzip")
-			_, err = http.DefaultClient.Do(req)
-			if err != nil {
-				ag.logger.Println(err)
-			}
-
+			ag.send(payload)
 			payload = []byte{}
 		}
 	}
+	ag.send(payload)
 
+	ag.done <- struct{}{}
+}
+
+func (ag * ActivityGenerator) send(payload []byte) {
 	if len(payload) > 0 {
-		req, err := http.NewRequest("POST", ag.endpoint, bytes.NewReader(payload))
-		if err != nil {
+		//req, err := http.NewRequest("POST", ag.endpoint, bytes.NewBuffer(payload))
+
+		var buf bytes.Buffer
+		g := gzip.NewWriter(&buf)
+		if _, err := g.Write(payload); err != nil {
+			ag.logger.Println(err)
+			return
+		}
+		if err := g.Close(); err != nil {
 			ag.logger.Println(err)
 			return
 		}
 
+		req, err := http.NewRequest("POST", ag.endpoint, &buf)
+		if err != nil {
+			ag.logger.Println(err)
+			return
+		}
+		req.Header.Add("Content-Encoding", "gzip")
 		_, err = http.DefaultClient.Do(req)
 		if err != nil {
 			ag.logger.Println(err)
 		}
 	}
-
-	ag.done <- struct{}{}
 }
