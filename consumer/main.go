@@ -17,6 +17,7 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 	var f *os.File
 	var encoder *json.Encoder
 	var cnt int
+	var fileName string
 
 	var refresh = func() {
 		if f != nil {
@@ -24,7 +25,8 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 		}
 		var err error
 		ctx, _ = context.WithTimeout(context.Background(), time.Minute*2)
-		f, err = os.Create(fmt.Sprintf("%v_%v.json", partition, time.Now().Format("2006-01-02_15-04-05.999")))
+		fileName = fmt.Sprintf("%v_%v.json", partition, time.Now().Format("2006-01-02_15-04-05.999"))
+		f, err = os.Create(fileName)
 		if err != nil {
 			panic(err)
 		}
@@ -63,7 +65,7 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 				fmt.Println("error while encoding message: ", err.Error())
 			}
 			cnt++
-			fmt.Println(cnt)
+			//fmt.Println(cnt)
 			if cnt == 100 {
 				refresh()
 				atomic.AddUint32(globalCnt, 100)
@@ -71,14 +73,16 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 		}
 	}
 	f.Close()
+	fmt.Println(fmt.Sprintf("Written: %v\n", fileName))
 }
 
 var kafkaAddr = os.Getenv("KAFKA_ADDR")
 
-var globalCnt *uint32 = new(uint32)
+var globalCnt = new(uint32)
 
 func main() {
-	conn, err := kafka.Dial("tcp", kafkaAddr)
+	//conn, err := kafka.Dial("tcp", kafkaAddr)
+	conn, err := kafka.DialContext(context.Background(),"tcp", kafkaAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -89,16 +93,24 @@ func main() {
 		panic(err)
 	}
 	for _, p := range partitions {
-		fmt.Println("Reader", p.ID, "started	")
+		fmt.Println("'Visit' reader", p.ID, "started	")
 		go Reader([]string{kafkaAddr}, "1", "visit", p.ID)
 	}
 
-	t := time.NewTicker(time.Second)
-	for {
-		<- t.C
-
-		fmt.Println(*globalCnt)
+	partitions, err = conn.ReadPartitions("activity")
+	if err != nil {
+		panic(err)
 	}
+	for _, p := range partitions {
+		fmt.Println("'Activity 'reader", p.ID, "started	")
+		go Reader([]string{kafkaAddr}, "1", "activity", p.ID)
+	}
+
+	//t := time.NewTicker(time.Second)
+	//for {
+	//	<- t.C
+	//	//fmt.Println(*globalCnt)
+	//}
 	//wg := sync.WaitGroup{}
 	//wg.Add(1)
 	//wg.Wait()

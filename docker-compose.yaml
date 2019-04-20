@@ -1,30 +1,64 @@
-version: '2'
+version: '3'
 
 services:
 
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
-    expose:
-    - "2181"
-    network_mode: host
+    # expose:
+    # - "2181"
+    ports:
+    - "2181:2181"
 
   kafka:
     image: wurstmeister/kafka:2.11-2.0.0
     depends_on:
     - zookeeper
+    # expose:
+    # - "9092"
+    links:
+      - zookeeper:zookeeper
     ports:
     - "9092:9092"
+    container_name: kafka
     environment:
       KAFKA_BROKER_ID: "1"
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
-      KAFKA_LISTENERS: PLAINTEXT://127.0.0.1:9092
-      KAFKA_ZOOKEEPER_CONNECT: 0.0.0.0:2181
-    network_mode: host
-  
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://:9092
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    
   client:
-    build:
-      context: ./client
+    build: ./client
+    depends_on:
+    - server
+    links:
+      - server:server
+    environment:
+      SERVER_ADDR: "server:8000"
+
+  server:
+    build: ./server
     depends_on:
     - kafka
+    links:
+      - kafka:kafka
+    ports:
+    - "8000:8000"
+    container_name: server
     environment:
-      KAFKA_ADDR: 127.0.0.1:9092
+      KAFKA_ADDR: "kafka:9092"
+
+  consumer:
+    build: ./consumer
+    depends_on:
+    - kafka
+    links:
+      - kafka:kafka
+    environment:
+      KAFKA_ADDR: "kafka:9092"
+
+  test:
+    build: ./test
+    depends_on:
+    - kafka
+    links:
+      - kafka:kafka
