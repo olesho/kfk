@@ -9,6 +9,6 @@ WORKDIR /go/src/github.com/olesho/kfk/consumer
 ADD . .
 
 RUN go build . 
-#CMD ./consumer
+CMD ./consumer
 
-CMD tail -f /dev/null
+#CMD tail -f /dev/null

@@ -10,28 +10,36 @@ import (
 	"github.com/olesho/kfk/structs"
 	"encoding/json"
 	"sync/atomic"
+	"log"
 )
 
-func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition int) {
+func Reader(kafkaBrokerUrls []string, topic string, partition int) {
 	var ctx context.Context
 	var f *os.File
 	var encoder *json.Encoder
-	var cnt int
+	var cnt = new(uint32)
 	var fileName string
+	var reader *kafka.Reader
 
 	var refresh = func() {
 		if f != nil {
-			f.Close()
+			err := f.Close()
+			if err != nil {
+				log.Println(err)
+			}
+			log.Println(fmt.Sprintf("%v records written to %v", *cnt, fileName))
+			log.Printf("Current offset: %v\n", reader.Offset())
 		}
 		var err error
 		ctx, _ = context.WithTimeout(context.Background(), time.Minute*2)
-		fileName = fmt.Sprintf("%v_%v.json", partition, time.Now().Format("2006-01-02_15-04-05.999"))
+		fileName = fmt.Sprintf("%v_%v_%v.json", topic, partition, time.Now().Format("2006-01-02_15-04-05.999"))
 		f, err = os.Create(fileName)
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
 		encoder = json.NewEncoder(f)
-		cnt = 0
+		*cnt = 0
 	}
 
 	config := kafka.ReaderConfig{
@@ -45,7 +53,7 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 		ReadLagInterval:	-1,
 	}
 
-	reader := kafka.NewReader(config)
+	reader = kafka.NewReader(config)
 	defer reader.Close()
 
 	refresh()
@@ -53,65 +61,71 @@ func Reader(kafkaBrokerUrls []string, clientId string, topic string, partition i
 		m, err := reader.ReadMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				fmt.Println("deadline exceeded")
+				log.Println("deadline exceeded")
 				refresh()
 			} else {
-				fmt.Println("error while receiving message: ", err.Error())
+				log.Println("error while receiving message: ", err.Error())
 			}
 		} else {
-			p := structs.VisitPayloadFromBytes(m.Value)
-			err = encoder.Encode(p)
-			if err != nil {
-				fmt.Println("error while encoding message: ", err.Error())
+			if kafkaTopic == "visit" {
+				p, err := structs.VisitPayloadFromBytes(m.Value)
+				if err != nil {
+					log.Println(err)
+				}
+				err = encoder.Encode(p)
+			} else if kafkaTopic == "activity" {
+				p, err := structs.ActivityPayloadFromBytes(m.Value)
+				if err != nil {
+					log.Println(err)
+				}
+				err = encoder.Encode(p)
 			}
-			cnt++
-			//fmt.Println(cnt)
-			if cnt == 100 {
+			if err != nil {
+				log.Println("error while encoding message: ", err.Error())
+			}
+			atomic.AddUint32(cnt, 1)
+			if *cnt == 100 {
 				refresh()
 				atomic.AddUint32(globalCnt, 100)
 			}
 		}
 	}
-	f.Close()
-	fmt.Println(fmt.Sprintf("Written: %v\n", fileName))
+	err := f.Close()
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println(fmt.Sprintf("%v records written to %v", *cnt, fileName))
 }
 
 var kafkaAddr = os.Getenv("KAFKA_ADDR")
+var kafkaTopic = os.Getenv("TOPIC")
 
 var globalCnt = new(uint32)
 
 func main() {
-	//conn, err := kafka.Dial("tcp", kafkaAddr)
+	// delay
+	time.Sleep(time.Second*2)
+
 	conn, err := kafka.DialContext(context.Background(),"tcp", kafkaAddr)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	defer conn.Close()
 
-	partitions, err := conn.ReadPartitions("visit")
+	partitions, err := conn.ReadPartitions(kafkaTopic)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	for _, p := range partitions {
-		fmt.Println("'Visit' reader", p.ID, "started	")
-		go Reader([]string{kafkaAddr}, "1", "visit", p.ID)
+		log.Printf("'%v' reader #%v started\n", kafkaTopic, p.ID)
+		go Reader([]string{kafkaAddr}, kafkaTopic, p.ID)
 	}
 
-	partitions, err = conn.ReadPartitions("activity")
-	if err != nil {
-		panic(err)
-	}
-	for _, p := range partitions {
-		fmt.Println("'Activity 'reader", p.ID, "started	")
-		go Reader([]string{kafkaAddr}, "1", "activity", p.ID)
-	}
 
-	//t := time.NewTicker(time.Second)
-	//for {
-	//	<- t.C
-	//	//fmt.Println(*globalCnt)
-	//}
-	//wg := sync.WaitGroup{}
-	//wg.Add(1)
-	//wg.Wait()
+	t := time.NewTicker(time.Second)
+	for {
+		<- t.C
+	}
 }

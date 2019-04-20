@@ -3,6 +3,8 @@ package structs
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 const VISIT_SIZE = 56
@@ -18,17 +20,21 @@ type VisitPayload struct {
 	Longitude  int64
 }
 
-func VisitPayloadFromBytes(b []byte) *VisitPayload {
-	p := &VisitPayload{}
-	p.DataVer = int(binary.BigEndian.Uint32(b[:4]))
-	p.UserId = int64(binary.BigEndian.Uint64(b[4:12]))
-	p.EnterTime = int64(binary.BigEndian.Uint64(b[12:20]))
-	p.ExitTime = int64(binary.BigEndian.Uint64(b[20:28]))
-	p.AlgorithmType = int(binary.BigEndian.Uint32(b[28:32]))
-	p.PoiId = int64(binary.BigEndian.Uint64(b[32:40]))
-	p.Latitude = int64(binary.BigEndian.Uint64(b[40:48]))
-	p.Longitude = int64(binary.BigEndian.Uint64(b[48:56]))
-	return p
+func VisitPayloadFromBytes(b []byte) (*VisitPayload, error) {
+	if len(b) == 56 {
+		p := &VisitPayload{}
+		p.DataVer = int(binary.BigEndian.Uint32(b[:4]))
+		p.UserId = int64(binary.BigEndian.Uint64(b[4:12]))
+		p.EnterTime = int64(binary.BigEndian.Uint64(b[12:20]))
+		p.ExitTime = int64(binary.BigEndian.Uint64(b[20:28]))
+		p.AlgorithmType = int(binary.BigEndian.Uint32(b[28:32]))
+		p.PoiId = int64(binary.BigEndian.Uint64(b[32:40]))
+		p.Latitude = int64(binary.BigEndian.Uint64(b[40:48]))
+		p.Longitude = int64(binary.BigEndian.Uint64(b[48:56]))
+		return p, nil
+	} else {
+		return nil, errors.New(fmt.Sprintf("Error decoding 'visit': invalid payload size: %v", len(b)))
+	}
 }
 
 func (p *VisitPayload) Bytes() []byte {
@@ -64,18 +70,22 @@ type ActivityPayload struct {
 	EndLongitude 	int64
 }
 
-func ActivityPayloadFromBytes(b []byte) *ActivityPayload {
-	p := &ActivityPayload{}
-	p.DataVer = int(binary.BigEndian.Uint32(b[:4]))
-	p.UserId = int64(binary.BigEndian.Uint64(b[4:12]))
-	p.ActivityType = int(binary.BigEndian.Uint64(b[12:16]))
-	p.StartTime = int64(binary.BigEndian.Uint64(b[16:24]))
-	p.EndTime = int64(binary.BigEndian.Uint32(b[24:32]))
-	p.StartLatitude = int64(binary.BigEndian.Uint64(b[32:40]))
-	p.StartLongitude = int64(binary.BigEndian.Uint64(b[40:48]))
-	p.EndLatitude = int64(binary.BigEndian.Uint64(b[48:56]))
-	p.EndLongitude = int64(binary.BigEndian.Uint64(b[56:64]))
-	return p
+func ActivityPayloadFromBytes(b []byte) (*ActivityPayload, error) {
+	if len(b) == 64 {
+		p := &ActivityPayload{}
+		p.DataVer = int(binary.BigEndian.Uint32(b[:4]))
+		p.UserId = int64(binary.BigEndian.Uint64(b[4:12]))
+		p.ActivityType = int(binary.BigEndian.Uint64(b[12:16]))
+		p.StartTime = int64(binary.BigEndian.Uint64(b[16:24]))
+		p.EndTime = int64(binary.BigEndian.Uint32(b[24:32]))
+		p.StartLatitude = int64(binary.BigEndian.Uint64(b[32:40]))
+		p.StartLongitude = int64(binary.BigEndian.Uint64(b[40:48]))
+		p.EndLatitude = int64(binary.BigEndian.Uint64(b[48:56]))
+		p.EndLongitude = int64(binary.BigEndian.Uint64(b[56:64]))
+		return p, nil
+	} else {
+		return nil, errors.New(fmt.Sprintf("Error decoding 'activity': invalid payload size: %v", len(b)))
+	}
 }
 
 func (p *ActivityPayload) Bytes() []byte {

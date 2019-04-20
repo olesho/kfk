@@ -8,4 +8,6 @@ WORKDIR /go/src/github.com/olesho/kfk/client
 ADD . .
 
 RUN go build .
-CMD ./client  -c 1 -r 100
+#CMD ./client -c 1 -r 100
+
+CMD tail -f /dev/null

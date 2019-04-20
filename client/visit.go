@@ -57,6 +57,7 @@ func (vg * VisitGenerator) Run(amount int64) {
 
 	for {
 		if *num == 0 {
+			vg.send(payload)
 			break
 		}
 
@@ -67,44 +68,36 @@ func (vg * VisitGenerator) Run(amount int64) {
 		atomic.AddInt64(num, -1)
 
 		if oldDay != vg.CurrentDay() {
-			var buf bytes.Buffer
-			g := gzip.NewWriter(&buf)
-			if _, err := g.Write(data); err != nil {
-				vg.logger.Println(err)
-				return
-			}
-			if err := g.Close(); err != nil {
-				vg.logger.Println(err)
-				return
-			}
-
-			req, err := http.NewRequest("POST", vg.endpoint, &buf)
-			if err != nil {
-				vg.logger.Println(err)
-				return
-			}
-			req.Header.Add("Content-Encoding", "gzip")
-			_, err = http.DefaultClient.Do(req)
-			if err != nil {
-				vg.logger.Println(err)
-			}
-
+			vg.send(payload)
 			payload = []byte{}
 		}
 	}
 
+	vg.done <- struct{}{}
+}
+
+func (vg * VisitGenerator) send(payload []byte) {
 	if len(payload) > 0 {
-		req, err := http.NewRequest("POST", vg.endpoint, bytes.NewReader(payload))
-		if err != nil {
+		var buf bytes.Buffer
+		g := gzip.NewWriter(&buf)
+		if _, err := g.Write(payload); err != nil {
+			vg.logger.Println(err)
+			return
+		}
+		if err := g.Close(); err != nil {
 			vg.logger.Println(err)
 			return
 		}
 
+		req, err := http.NewRequest("POST", vg.endpoint, &buf)
+		if err != nil {
+			vg.logger.Println(err)
+			return
+		}
+		req.Header.Add("Content-Encoding", "gzip")
 		_, err = http.DefaultClient.Do(req)
 		if err != nil {
 			vg.logger.Println(err)
 		}
 	}
-
-	vg.done <- struct{}{}
 }
