@@ -21,7 +21,7 @@ func main() {
 	for i := 0; i < *clientsNum; i++ {
 		clientId := int64(uuid.New().ID())
 		ag := NewActivityGenerator(clientId, fmt.Sprintf("http://%v/api/activity/v1/", serverAddr), done, log.New(os.Stdout, "activity:", 0))
-		vg := NewVisitGenerator(clientId, fmt.Sprintf("http://%v/api/activity/v1/", serverAddr), done, log.New(os.Stdout, "activity:", 0))
+		vg := NewVisitGenerator(clientId, fmt.Sprintf("http://%v/api/visit/v1/", serverAddr), done, log.New(os.Stdout, "visit:", 0))
 		go vg.Run(*requestsNum)
 		go ag.Run(*requestsNum)
 	}

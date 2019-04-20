@@ -75,7 +75,7 @@ func ActivityPayloadFromBytes(b []byte) (*ActivityPayload, error) {
 		p := &ActivityPayload{}
 		p.DataVer = int(binary.BigEndian.Uint32(b[:4]))
 		p.UserId = int64(binary.BigEndian.Uint64(b[4:12]))
-		p.ActivityType = int(binary.BigEndian.Uint64(b[12:16]))
+		p.ActivityType = int(binary.BigEndian.Uint32(b[12:16]))
 		p.StartTime = int64(binary.BigEndian.Uint64(b[16:24]))
 		p.EndTime = int64(binary.BigEndian.Uint32(b[24:32]))
 		p.StartLatitude = int64(binary.BigEndian.Uint64(b[32:40]))

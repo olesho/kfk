@@ -71,18 +71,24 @@ func Reader(kafkaBrokerUrls []string, topic string, partition int) {
 				p, err := structs.VisitPayloadFromBytes(m.Value)
 				if err != nil {
 					log.Println(err)
+				} else {
+					err = encoder.Encode(p)
+					if err != nil {
+						log.Println("error while encoding message: ", err.Error())
+					}
 				}
-				err = encoder.Encode(p)
 			} else if kafkaTopic == "activity" {
 				p, err := structs.ActivityPayloadFromBytes(m.Value)
 				if err != nil {
 					log.Println(err)
+				} else {
+					err = encoder.Encode(p)
+					if err != nil {
+						log.Println("error while encoding message: ", err.Error())
+					}
 				}
-				err = encoder.Encode(p)
 			}
-			if err != nil {
-				log.Println("error while encoding message: ", err.Error())
-			}
+
 			atomic.AddUint32(cnt, 1)
 			if *cnt == 100 {
 				refresh()
