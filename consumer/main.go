@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"sync/atomic"
 	"log"
+	"net/http"
 )
 
 func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int) {
@@ -31,7 +32,7 @@ func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int)
 		}
 		var err error
 		ctx, _ = context.WithTimeout(context.Background(), time.Minute*2)
-		fileName = fmt.Sprintf("%v_%v_%v.json", kafkaTopic, partition, time.Now().Format("2006-01-02_15-04-05.999"))
+		fileName = fmt.Sprintf("%v/%v_%v_%v.json", storageDir, kafkaTopic, partition, time.Now().Format("2006-01-02_15-04-05.999"))
 		f, err = os.Create(fileName)
 		if err != nil {
 			log.Println(err)
@@ -113,19 +114,30 @@ func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int)
 
 
 var globalCnt = new(uint32)
+var storageDir = "./files"
 
 func main() {
+	if _, err := os.Stat("files"); os.IsNotExist(err) {
+		os.Mkdir("files", os.ModePerm)
+	}
+
 	var kafkaAddr = os.Getenv("KAFKA_ADDR")
 	var kafkaTopic = os.Getenv("TOPIC")
 	var groupId = os.Getenv("GROUP_ID")
+	var port = os.Getenv("PORT")
 
-	// delay
-	time.Sleep(time.Second*2)
+	// try dialing until Kafka is up and connection established
+	var conn *kafka.Conn
+	for {
+		var err error
+		time.Sleep(time.Second*1)
+		conn, err = kafka.DialContext(context.Background(),"tcp", kafkaAddr)
+		if err != nil {
+			log.Println(err)
+		} else {
+			break
+		}
 
-	conn, err := kafka.DialContext(context.Background(),"tcp", kafkaAddr)
-	if err != nil {
-		log.Println(err)
-		return
 	}
 	defer conn.Close()
 
@@ -139,9 +151,9 @@ func main() {
 		go Reader([]string{kafkaAddr}, kafkaTopic, groupId, p.ID)
 	}
 
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(storageDir))))
 
-	t := time.NewTicker(time.Second)
-	for {
-		<- t.C
+	if err := http.ListenAndServe(fmt.Sprintf(":%v", port), nil); err != nil {
+		panic(err)
 	}
 }

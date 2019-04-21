@@ -17,19 +17,21 @@ type VisitGenerator struct {
 	endpoint 			string
 	done				chan struct{}
 	logger 				*log.Logger
-
-	_cnt int64
 }
 
-func NewVisitGenerator(clientId int64, endpoint string, doneSignal chan struct{}, logger *log.Logger) *VisitGenerator {
+func NewVisitGenerator(clientId int64, endpoint string, logger *log.Logger) *VisitGenerator {
 	startTime, _ := time.Parse("2006-01-02T15:04:05", "2018-01-01T00:00:00")
 	return &VisitGenerator{
 		clientId: 			clientId,
 		currentStartTime: 	startTime,
 		endpoint:			endpoint,
-		done:				doneSignal,
+		done:				make(chan struct{}),
 		logger:				logger,
 	}
+}
+
+func (vg *VisitGenerator) DoneSignal() chan struct{} {
+	return vg.done
 }
 
 func (vg *VisitGenerator) Next() *structs.VisitPayload {
@@ -40,10 +42,9 @@ func (vg *VisitGenerator) Next() *structs.VisitPayload {
 		ExitTime:		vg.currentStartTime.Add(time.Minute*40).UnixNano(),
 		AlgorithmType: 	rand.Intn(6)+1,
 		PoiId:         	rand.Int63(),
-		Latitude:		0,
-		Longitude:		vg._cnt,
+		Latitude:		structs.RandLatitude(),
+		Longitude:		structs.RandLongitude(),
 	}
-	vg._cnt++
 	vg.currentStartTime = vg.currentStartTime.Add(time.Hour*2)
 	return p
 }

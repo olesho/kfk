@@ -20,15 +20,19 @@ type ActivityGenerator struct {
 	logger 				*log.Logger
 }
 
-func NewActivityGenerator(clientId int64, endpoint string, doneSignal chan struct{}, logger *log.Logger) *ActivityGenerator {
+func NewActivityGenerator(clientId int64, endpoint string, logger *log.Logger) *ActivityGenerator {
 	startTime, _ := time.Parse("2006-01-02T15:04:05", "2018-01-01T00:00:00")
 	return &ActivityGenerator{
 		clientId: 			clientId,
 		currentStartTime: 	startTime,
 		endpoint:			endpoint,
-		done:				doneSignal,
+		done:				make(chan struct{}),
 		logger:				logger,
 	}
+}
+
+func (ag *ActivityGenerator) DoneSignal() chan struct{} {
+	return ag.done
 }
 
 func (ag *ActivityGenerator) Next() *structs.ActivityPayload {
@@ -38,10 +42,10 @@ func (ag *ActivityGenerator) Next() *structs.ActivityPayload {
 		ActivityType: 	int(math.Pow(2, float64(rand.Intn(31)+1))),
 		StartTime:		ag.currentStartTime.UnixNano(),
 		EndTime:		ag.currentStartTime.Add(time.Minute*30).UnixNano(),
-		StartLatitude:	0,
-		StartLongitude:	0,
-		EndLatitude:	0,
-		EndLongitude:	0,
+		StartLatitude:	structs.RandLatitude(),
+		StartLongitude:	structs.RandLongitude(),
+		EndLatitude:	structs.RandLatitude(),
+		EndLongitude:	structs.RandLongitude(),
 	}
 	ag.currentStartTime = ag.currentStartTime.Add(time.Hour*2)
 	return p

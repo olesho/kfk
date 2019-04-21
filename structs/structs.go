@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 )
 
 const VISIT_SIZE = 56
@@ -108,4 +109,16 @@ func (p *ActivityPayload) JSON() []byte {
 		panic(err)
 	}
 	return r
+}
+
+func RandLatitude() int64 {
+	return rand.Int63n(36000)-18000
+}
+
+func RandLongitude() int64 {
+	return rand.Int63n(9000)
+}
+
+func Int64ToGUUD(l int64) float64 {
+	return float64(l)/100
 }

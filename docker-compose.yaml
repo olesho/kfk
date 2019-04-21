@@ -34,6 +34,11 @@ services:
       - server:server
     environment:
       SERVER_ADDR: "server:8000"
+      PORT: 8000
+    expose:
+      - "8000"
+    ports:
+    - "8000:8000"    
 
   server:
     build: ./server
@@ -47,6 +52,7 @@ services:
     environment:
       KAFKA_ADDR: "kafka:9092"
 
+  # visit consumer frontend should be accessible on 0.0.0.0:8001
   visit_consumer:
     build: ./consumer
     depends_on:
@@ -57,7 +63,13 @@ services:
       KAFKA_ADDR: "kafka:9092"
       TOPIC: visit
       GROUP_ID: 3
+      PORT: 8001
+    expose:
+      - "8001"
+    ports:
+    - "8001:8001"
 
+  # activity consumer frontend should be accessible on 0.0.0.0:8002
   activity_consumer:
     build: ./consumer
     depends_on:
@@ -68,6 +80,11 @@ services:
       KAFKA_ADDR: "kafka:9092"
       TOPIC: activity
       GROUP_ID: 4
+      PORT: 8002
+    expose:
+      - "8002"
+    ports:
+    - "8002:8002"
 
   test:
     build: ./test
