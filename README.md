@@ -4,12 +4,26 @@ Kafka test task
 ## Requirements:
 - Docker & docker-compose
 
-## Start:
+## Deployment:
 ```
 docker-compose up
 ```
 
+## Testing
+Test request to generate 1000 messages in 4 threads:
+```
+http://localhost:8003/generate/threads=4&requests=1000
+```
+
+## Consumers
+"Visit" consumer:
+```
+http://localhost:8001
+```
+"Activity" consumer:
+```
+http://localhost:8002
+```
+
 ## TODO
-- [ ] Random Longitude/Latitude generation
-- [ ] Client frontend
 - [ ] Add configurational env variables for "send timeout" and "send batch size"
