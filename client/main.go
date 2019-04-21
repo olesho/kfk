@@ -18,7 +18,11 @@ func main() {
 	threadsNum := 1
 	requestsNum := 1000
 
-	http.HandleFunc("/generate", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Client (requests generator) service example"))
+	})
+
+	http.HandleFunc("/generate/", func(w http.ResponseWriter, r *http.Request) {
 		m, _ := url.ParseQuery(r.URL.RawQuery)
 		if arr, ok := m["threads"]; ok {
 			if len(arr) > 0 {
@@ -30,7 +34,14 @@ func main() {
 				requestsNum, _ = strconv.Atoi(arr[0])
 			}
 		}
+
+		startTime := time.Now()
 		generate(threadsNum, requestsNum)
+		w.Write([]byte(fmt.Sprintf("Done in:", time.Now().Sub(startTime).Seconds(), "seconds\n")))
+		w.Write([]byte(fmt.Sprintf("Sent %v requests total\n", threadsNum*requestsNum*2)))
+
+		log.Println("Done in:", time.Now().Sub(startTime).Seconds(), "seconds")
+		log.Printf("Sent %v requests total\n", threadsNum*requestsNum*2)
 	})
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%v", port), nil); err != nil {
@@ -42,7 +53,6 @@ func generate(threads, requestsPerThread int) {
 	vgs := make([]*VisitGenerator, threads)
 	ags := make([]*ActivityGenerator, threads)
 
-	startTime := time.Now()
 	for i := 0; i < threads; i++ {
 		clientId := int64(uuid.New().ID())
 		ags[i] = NewActivityGenerator(clientId, fmt.Sprintf("http://%v/api/activity/v1/", serverAddr), log.New(os.Stdout, "activity:", 0))
@@ -55,8 +65,5 @@ func generate(threads, requestsPerThread int) {
 		<- ags[i].DoneSignal() // wait for visit generation finish
 		<- vgs[i].DoneSignal() // wait for activity generation finish
 	}
-
-	fmt.Println("Done in:", time.Now().Sub(startTime).Seconds(), "seconds")
-	fmt.Printf("Sent %v requests total\n", threads*requestsPerThread*2)
 }
 
