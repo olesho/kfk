@@ -18,7 +18,8 @@ import (
 	"math/rand"
 )
 
-var DeleteTopicHandler = func(w http.ResponseWriter, r *http.Request) {
+// used for testing purposes
+func deleteTopicHandler(w http.ResponseWriter, r *http.Request) {
 	err := DeleteTopic("visit")
 	if err != nil {
 		fmt.Println(err)
@@ -29,7 +30,8 @@ var DeleteTopicHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var ListTopicsHandler = func(w http.ResponseWriter, r *http.Request) {
+// used for testing purposes
+func listTopicsHandler(w http.ResponseWriter, r *http.Request) {
 	ids, err := ListPartitions("visit")
 	if err != nil {
 		log.Println(err)
@@ -45,7 +47,8 @@ var ListTopicsHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var CreateTopicHandler = func(w http.ResponseWriter, r *http.Request) {
+// used for testing purposes
+func createTopicHandler(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.RequestURI, "/")
 	numPartitions, _ := strconv.Atoi(parts[len(parts)-1])
 
@@ -60,7 +63,8 @@ var CreateTopicHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var LoadHandler = func(w http.ResponseWriter, r *http.Request) {
+// used for testing purposes
+func loadHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	dialer := &kafka.Dialer{
@@ -72,12 +76,9 @@ var LoadHandler = func(w http.ResponseWriter, r *http.Request) {
 		BatchSize:		  1,
 		Brokers:          []string{kafkaAddr},
 		Topic:            "visit",
-		//Balancer:			&kafka.Hash{},
-		//Balancer:         &kafka.LeastBytes{},
 		Dialer:           dialer,
 		WriteTimeout:     10 * time.Second,
 		ReadTimeout:      10 * time.Second,
-		//CompressionCodec: snappy.NewCompressionCodec(),
 	}
 	visitWriter := kafka.NewWriter(config)
 
@@ -120,7 +121,15 @@ var LoadHandler = func(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Done in:", time.Now().Sub(start).Seconds())
 }
 
-var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
+func VisitHandler(w http.ResponseWriter, r *http.Request) {
+	messageHandler(w, r, &structs.VisitPayload{}, visitGateway)
+}
+
+func ActivityHandler(w http.ResponseWriter, r *http.Request) {
+	messageHandler(w, r, &structs.ActivityPayload{}, activityGateway)
+}
+
+func messageHandler(w http.ResponseWriter, r *http.Request, v structs.Payload, gateway *Gateway) {
 	var reader io.ReadCloser
 	switch r.Header.Get("Content-Encoding") {
 	case "gzip":
@@ -137,14 +146,13 @@ var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		v := &structs.VisitPayload{}
 		err := json.Unmarshal(scanner.Bytes(), v)
 		if err != nil {
 			log.Println(err)
 		}
 
 		// 1 MSG
-		visitGateway.Push(&kafka.Message{
+		gateway.Push(&kafka.Message{
 			Value: v.Bytes(),
 		})
 	}
@@ -154,41 +162,7 @@ var VisitHandler = func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var ActivityHandler = func(w http.ResponseWriter, r *http.Request) {
-	var reader io.ReadCloser
-	switch r.Header.Get("Content-Encoding") {
-	case "gzip":
-		var err error
-		reader, err = gzip.NewReader(r.Body)
-		if err != nil {
-			log.Println(err)
-		}
-		defer reader.Close()
-	default:
-		reader = r.Body
-	}
-
-	scanner := bufio.NewScanner(reader)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		v := &structs.ActivityPayload{}
-		err := json.Unmarshal(scanner.Bytes(), v)
-		if err != nil {
-			log.Println(err)
-		}
-
-		// 1 MSG
-		activityGateway.Push(&kafka.Message{
-			Value: v.Bytes(),
-		})
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Println(err)
-	}
-}
-
-var ShutdownHandler = func(w http.ResponseWriter, r *http.Request) {
+func ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	os.Exit(0)
 }
 
@@ -204,10 +178,10 @@ func serve() {
 	defer activityGateway.Close()
 	activityGateway.RunStream()
 
-	http.HandleFunc("/api/topic/load/v1/", LoadHandler) // test
-	http.HandleFunc("/api/topic/delete/v1/", DeleteTopicHandler) // delete topics
-	http.HandleFunc("/api/topic/list/v1/", ListTopicsHandler) // list topics
-	http.HandleFunc("/api/topic/create/v1/", CreateTopicHandler) // create topics
+	http.HandleFunc("/api/topic/load/v1/", loadHandler) // test
+	http.HandleFunc("/api/topic/delete/v1/", deleteTopicHandler) // delete topics
+	http.HandleFunc("/api/topic/list/v1/", listTopicsHandler) // list topics
+	http.HandleFunc("/api/topic/create/v1/", createTopicHandler) // create topics
 	http.HandleFunc("/api/shutdown/v1/", ShutdownHandler) // exit app
 	http.HandleFunc("/api/visit/v1/", VisitHandler)
 	http.HandleFunc("/api/activity/v1/", ActivityHandler)

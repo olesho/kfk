@@ -22,7 +22,10 @@ func TestStructSizes(t *testing.T) {
 	fmt.Println((len(p.Bytes())))
 	fmt.Println(len(p.JSON()))
 
-	p1 := VisitPayloadFromBytes(p.Bytes())
+	p1, err := VisitPayloadFromBytes(p.Bytes())
+	if err != nil {
+		panic(err)
+	}
 
 	a.Equal(p.DataVer, p1.DataVer)
 	a.Equal(p.UserId, p1.UserId)

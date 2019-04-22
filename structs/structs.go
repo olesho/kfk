@@ -10,6 +10,10 @@ import (
 
 const VISIT_SIZE = 56
 
+type Payload interface {
+	Bytes() []byte
+}
+
 type VisitPayload struct {
 	DataVer int
 	UserId  int64
