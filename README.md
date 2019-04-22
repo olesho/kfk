@@ -12,9 +12,9 @@ docker-compose up
 ## Testing
 Test endpoint to generate 1000 requests in 4 threads:
 ```
-http://localhost:8003/generate/threads=4&requests=1000
+http://localhost:8003/?threads=4&requests=1000
 ```
-One request generates one "activity" and one "visit". So upper example will generate 2 * 1000 * 4 requests. 
+One request generates one "activity" and one "visit". So upper example will generate 2 * 1000 * 4 requests. Each thread (client) will have unique user id.
 
 ## Consumers
 "Visit" consumer JSON files:
