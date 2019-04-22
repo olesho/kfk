@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"log"
 	"compress/gzip"
+	"github.com/google/uuid"
 )
 
 type ActivityGenerator struct {
@@ -20,10 +21,10 @@ type ActivityGenerator struct {
 	logger 				*log.Logger
 }
 
-func NewActivityGenerator(clientId int64, endpoint string, logger *log.Logger) *ActivityGenerator {
+func NewActivityGenerator(endpoint string, logger *log.Logger) *ActivityGenerator {
 	startTime, _ := time.Parse("2006-01-02T15:04:05", "2018-01-01T00:00:00")
 	return &ActivityGenerator{
-		clientId: 			clientId,
+		clientId: 			int64(uuid.New().ID()),
 		currentStartTime: 	startTime,
 		endpoint:			endpoint,
 		done:				make(chan struct{}),

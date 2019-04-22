@@ -3,11 +3,9 @@ package main
 import (
 	"time"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"os"
 	"net/http"
-	"net/url"
 	"strconv"
 )
 
@@ -23,13 +21,12 @@ func main() {
 	})
 
 	http.HandleFunc("/generate/", func(w http.ResponseWriter, r *http.Request) {
-		m, _ := url.ParseQuery(r.URL.RawQuery)
-		if arr, ok := m["threads"]; ok {
+		if arr, ok := r.URL.Query()["threads"]; ok {
 			if len(arr) > 0 {
 				threadsNum, _ = strconv.Atoi(arr[0])
 			}
 		}
-		if arr, ok := m["requests"]; ok {
+		if arr, ok := r.URL.Query()["requests"]; ok {
 			if len(arr) > 0 {
 				requestsNum, _ = strconv.Atoi(arr[0])
 			}
@@ -54,9 +51,8 @@ func generate(threads, requestsPerThread int) {
 	ags := make([]*ActivityGenerator, threads)
 
 	for i := 0; i < threads; i++ {
-		clientId := int64(uuid.New().ID())
-		ags[i] = NewActivityGenerator(clientId, fmt.Sprintf("http://%v/api/activity/v1/", serverAddr), log.New(os.Stdout, "activity:", 0))
-		vgs[i] = NewVisitGenerator(clientId, fmt.Sprintf("http://%v/api/visit/v1/", serverAddr), log.New(os.Stdout, "visit:", 0))
+		ags[i] = NewActivityGenerator(fmt.Sprintf("http://%v/api/activity/v1/", serverAddr), log.New(os.Stdout, "activity:", 0))
+		vgs[i] = NewVisitGenerator(fmt.Sprintf("http://%v/api/visit/v1/", serverAddr), log.New(os.Stdout, "visit:", 0))
 		go vgs[i].Run(requestsPerThread)
 		go ags[i].Run(requestsPerThread)
 	}

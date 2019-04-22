@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"log"
 	"compress/gzip"
+	"github.com/google/uuid"
 )
 
 type VisitGenerator struct {
@@ -19,10 +20,10 @@ type VisitGenerator struct {
 	logger 				*log.Logger
 }
 
-func NewVisitGenerator(clientId int64, endpoint string, logger *log.Logger) *VisitGenerator {
+func NewVisitGenerator(endpoint string, logger *log.Logger) *VisitGenerator {
 	startTime, _ := time.Parse("2006-01-02T15:04:05", "2018-01-01T00:00:00")
 	return &VisitGenerator{
-		clientId: 			clientId,
+		clientId: 			int64(uuid.New().ID()),
 		currentStartTime: 	startTime,
 		endpoint:			endpoint,
 		done:				make(chan struct{}),
