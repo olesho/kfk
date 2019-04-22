@@ -15,34 +15,7 @@ import (
 )
 
 func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int) {
-	var ctx context.Context
-	var f *os.File
-	var encoder *json.Encoder
-	var cnt = new(uint32)
-	var fileName string
-	var reader *kafka.Reader
-
-	var refresh = func() {
-		if f != nil {
-			err := f.Close()
-			if err != nil {
-				log.Println(err)
-			}
-			log.Println(fmt.Sprintf("%v records written to %v", *cnt, fileName))
-		}
-		var err error
-		ctx, _ = context.WithTimeout(context.Background(), time.Minute*2)
-		fileName = fmt.Sprintf("%v/%v_%v_%v.json", storageDir, kafkaTopic, partition, time.Now().Format("2006-01-02_15-04-05.999"))
-		f, err = os.Create(fileName)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		encoder = json.NewEncoder(f)
-		*cnt = 0
-	}
-
-	config := kafka.ReaderConfig{
+	reader := kafka.NewReader(kafka.ReaderConfig{
 		Partition:		partition,
 		Brokers:		kafkaBrokerUrls,
 		GroupID:        groupId,
@@ -51,21 +24,40 @@ func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int)
 		MaxBytes:		10e6,            // 10MB
 		MaxWait:		1 * time.Second, // Maximum amount of time to wait for new data to come when fetching batches of messages from kafka.
 		ReadLagInterval:	-1,
-	}
-
-	reader = kafka.NewReader(config)
-	defer reader.Close()
-
-	refresh()
+	})
 	for {
+		readBatch(reader, partition, kafkaTopic)
+	}
+}
+
+func readBatch(reader *kafka.Reader, partition int, kafkaTopic string) {
+	var cnt = new(uint32)
+	var encoder *json.Encoder
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
+
+	fileName := fmt.Sprintf("%v/%v_%v_%v.json", storageDir, kafkaTopic, partition, time.Now().Format("2006-01-02_15-04-05.999"))
+	f, err := os.Create(fileName)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer f.Close()
+
+
+	encoder = json.NewEncoder(f)
+	*cnt = 0
+
+	for *cnt < 100 {
 		m, err := reader.ReadMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				log.Println("deadline exceeded")
-				refresh()
 			} else {
 				log.Println("error while receiving message: ", err.Error())
 			}
+			return
 		} else {
 			if kafkaTopic == "visit" {
 				p, err := structs.VisitPayloadFromBytes(m.Value)
@@ -93,25 +85,15 @@ func Reader(kafkaBrokerUrls []string, kafkaTopic, groupId string, partition int)
 				}
 			}
 
-			if *cnt == 100 {
-				refresh()
-				atomic.AddUint32(globalCnt, 100)
-			}
-
 			err = reader.CommitMessages(context.Background(), m)
 			if err != nil {
 				log.Println(err)
 			}
 		}
 	}
-	err := f.Close()
-	if err != nil {
-		log.Println(err)
-	}
-	log.Println(fmt.Sprintf("%v records written to %v", *cnt, fileName))
+
+	atomic.AddUint32(globalCnt, *cnt)
 }
-
-
 
 var globalCnt = new(uint32)
 var storageDir = "./files"

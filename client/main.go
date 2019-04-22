@@ -37,7 +37,7 @@ func main() {
 
 		startTime := time.Now()
 		generate(threadsNum, requestsNum)
-		w.Write([]byte(fmt.Sprintf("Done in:", time.Now().Sub(startTime).Seconds(), "seconds\n")))
+		w.Write([]byte(fmt.Sprintf("Done in: %v seconds\n", time.Now().Sub(startTime).Seconds())))
 		w.Write([]byte(fmt.Sprintf("Sent %v requests total\n", threadsNum*requestsNum*2)))
 
 		log.Printf("Done in %v seconds\n", time.Now().Sub(startTime).Seconds())
