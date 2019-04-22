@@ -108,6 +108,8 @@ func main() {
 	var groupId = os.Getenv("GROUP_ID")
 	var port = os.Getenv("PORT")
 
+	var partitions []kafka.Partition
+
 	// try dialing until Kafka is up and connection established
 	var conn *kafka.Conn
 	for {
@@ -116,18 +118,19 @@ func main() {
 		conn, err = kafka.DialContext(context.Background(),"tcp", kafkaAddr)
 		if err != nil {
 			log.Println(err)
+			continue
+		}
+
+		partitions, err = conn.ReadPartitions(kafkaTopic)
+		if err != nil {
+			log.Println(err)
 		} else {
 			break
 		}
-
 	}
 	defer conn.Close()
 
-	partitions, err := conn.ReadPartitions(kafkaTopic)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+
 	for _, p := range partitions {
 		log.Printf("'%v' reader #%v started\n", kafkaTopic, p.ID)
 		go Reader([]string{kafkaAddr}, kafkaTopic, groupId, p.ID)
